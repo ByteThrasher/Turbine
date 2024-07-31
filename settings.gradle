@@ -1,0 +1,4 @@
+rootProject.name = 'turbine'
+
+include 'turbine-application'
+include 'turbine-library'
