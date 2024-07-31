@@ -16,6 +16,4 @@ public interface LocationContainer {
      * This method returns null instead of Optional because creating a lot of Optional instances is very expensive.
      */
     String grabLocation(String domain);
-
-    boolean hasFreeSpace();
 }

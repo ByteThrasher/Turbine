@@ -7,6 +7,8 @@ import com.bytethrasher.turbine.location.provider.LocationProvider;
 import lombok.Builder;
 import lombok.SneakyThrows;
 
+import java.nio.file.Path;
+
 /**
  * The main class that can be used to create and start the crawler.
  */
@@ -14,24 +16,21 @@ import lombok.SneakyThrows;
 public class Turbine {
 
     @Builder.Default
-    private final LocationProvider locationProvider = new FileBasedLocationProvider();
+    private final LocationProvider locationProvider = FileBasedLocationProvider.builder()
+            .locationFile(Path.of("./locations.txt"))
+            .build();
+
     @Builder.Default
-    private final LocationContainer locationContainer = new DefaultLocationContainer();
+    private final LocationContainer locationContainer = DefaultLocationContainer.builder()
+            .build();
 
     @SneakyThrows
     public void start() {
         // TODO: while not stopped/interrupted
         while (true) {
-            if (!locationContainer.hasFreeSpace()) {
-                Thread.sleep(1000);
-
-                continue;
-            }
-
             locationContainer.registerLocations(locationProvider.provideLocations());
 
-            // TODO: start new thread if needed
-            Thread.sleep(1000);
+            //TODO: Start new threads to process the locations
         }
     }
 }
