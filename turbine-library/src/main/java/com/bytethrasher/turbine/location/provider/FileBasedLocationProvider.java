@@ -1,20 +1,59 @@
 package com.bytethrasher.turbine.location.provider;
 
 import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
+import com.bytethrasher.turbine.url.URLParser;
 import lombok.Builder;
 import lombok.NonNull;
+import lombok.SneakyThrows;
 
+import java.io.BufferedReader;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedList;
+import java.util.List;
 
-@Builder
 public class FileBasedLocationProvider implements LocationProvider {
 
-    @NonNull
-    private final Path locationFile;
+    private final URLParser urlParser = new URLParser();
+    private final BufferedReader locationReader;
+
+    private String lastLine;
+
+    @Builder
+    @SneakyThrows
+    public FileBasedLocationProvider(@NonNull final Path locationPath) {
+        locationReader = Files.newBufferedReader(locationPath);
+        lastLine = locationReader.readLine();
+    }
 
     @Override
+    @SneakyThrows
     public LocationBatch provideLocations() {
-        // TODO
-        return null;
+        if (lastLine == null) {
+            // Terminating the provider
+            return null;
+        }
+
+        final String domain = urlParser.parseDomain(lastLine);
+
+        final List<String> locations = new LinkedList<>();
+
+        String actualDomain = domain;
+
+        while (actualDomain.equals(domain)) {
+            locations.add(lastLine);
+
+            lastLine = locationReader.readLine();
+
+            if (lastLine == null) {
+                locationReader.close();
+                break;
+            }
+
+            actualDomain = urlParser.parseDomain(lastLine);
+        }
+
+        return new LocationBatch(domain, locations);
     }
 }

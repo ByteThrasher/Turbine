@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.SneakyThrows;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -22,6 +23,7 @@ import java.util.concurrent.Semaphore;
 public class DefaultLocationContainer implements LocationContainer {
 
     private final Map<String, List<String>> locations = new HashMap<>();
+    private final List<String> availableDomains = new LinkedList<>();
 
     private final Semaphore semaphore = new Semaphore(0);
 
@@ -39,6 +41,8 @@ public class DefaultLocationContainer implements LocationContainer {
         } else {
             // The location provider should return a modifiable set by design!
             locations.put(nextBatch.domain(), nextBatch.locations());
+
+            availableDomains.add(nextBatch.domain());
         }
 
         actualLocationsUnderProcessing += nextBatch.locations().size();
@@ -65,5 +69,14 @@ public class DefaultLocationContainer implements LocationContainer {
         }
 
         return location;
+    }
+
+    @Override
+    public String grabDomain() {
+        if (availableDomains.isEmpty()) {
+            return null;
+        }
+
+        return availableDomains.removeLast();
     }
 }
