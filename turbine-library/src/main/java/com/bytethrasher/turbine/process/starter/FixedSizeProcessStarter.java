@@ -2,12 +2,16 @@ package com.bytethrasher.turbine.process.starter;
 
 import com.bytethrasher.turbine.location.container.LocationContainer;
 import com.bytethrasher.turbine.process.CrawlingProcess;
+import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.domain.Response;
+import com.bytethrasher.turbine.response.ResponseHandler;
 import lombok.Builder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 
 @Slf4j
 @Builder
@@ -42,11 +46,14 @@ public class FixedSizeProcessStarter implements ProcessStarter {
     }
 
     @Override
-    public void startProcess(final String domain, final LocationContainer locationContainer) {
+    public void startProcess(final String domain, final LocationContainer locationContainer,
+            final RequestHandler requestHandler, final ResponseHandler responseHandler,
+            final BlockingQueue<Response> queue) {
         threads.add(
                 Thread.ofVirtual()
                         .name(domain)
-                        .start(new CrawlingProcess(domain, crawlDelay, locationContainer))
+                        // TODO: I think the response handler should come from outside as well...
+                        .start(new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandler, responseHandler, queue))
         );
     }
 }

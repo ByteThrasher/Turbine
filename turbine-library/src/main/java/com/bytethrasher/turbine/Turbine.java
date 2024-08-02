@@ -7,14 +7,23 @@ import com.bytethrasher.turbine.location.provider.LocationProvider;
 import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
 import com.bytethrasher.turbine.process.starter.FixedSizeProcessStarter;
 import com.bytethrasher.turbine.process.starter.ProcessStarter;
+import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandler;
+import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.domain.Response;
+import com.bytethrasher.turbine.response.ResponseHandler;
+import com.bytethrasher.turbine.response.writer.ResponseWriter;
+import com.bytethrasher.turbine.response.writer.WARCResponseWriter;
+import com.bytethrasher.turbine.util.queue.BoundedPriorityBlockingQueue;
 import lombok.Builder;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
 
 /**
  * The main class that can be used to create and start the crawler.
  */
+@Slf4j
 @Builder
 public class Turbine {
 
@@ -31,8 +40,30 @@ public class Turbine {
     private final ProcessStarter processStarter = FixedSizeProcessStarter.builder()
             .build();
 
+    @Builder.Default
+    private final RequestHandler requestHandler = ApacheHttpClientRequestHandler.builder()
+            .build();
+
+    @Builder.Default
+    private final ResponseHandler responseHandler = ResponseHandler.builder()
+            .build();
+
+    @Builder.Default
+    private final ResponseWriter responseWriter = WARCResponseWriter.builder()
+            .build();
+
+    @Builder.Default
+    // TODO: queue what? Should be more specific.
+    private final int queueCapacity = 100;
+
     @SneakyThrows
     public void start() {
+        log.info("Starting the turbine engine.");
+
+        final BoundedPriorityBlockingQueue<Response> queue = new BoundedPriorityBlockingQueue<>(queueCapacity);
+
+        Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
+
         // TODO: while not stopped/interrupted
         while (true) {
             final LocationBatch locationBatch = locationProvider.provideLocations();
@@ -49,7 +80,8 @@ public class Turbine {
                 final String domain = locationContainer.grabDomain();
 
                 if (domain != null) {
-                    processStarter.startProcess(domain, locationContainer);
+                    // TODO: Instead of passing the queue around, there should be an abstraction above it.
+                    processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
                 }
             }
         }
