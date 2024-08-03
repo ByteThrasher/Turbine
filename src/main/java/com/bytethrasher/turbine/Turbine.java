@@ -64,8 +64,6 @@ public class Turbine {
 
         Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
 
-        boolean noMoreLocations = false;
-
         Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
             while (true) {
                 final LocationBatch locationBatch = locationProvider.provideLocations();
