@@ -1,34 +1,35 @@
-subprojects {
-    apply plugin: 'java'
+apply plugin: 'java'
+apply plugin: 'java-library'
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
     }
+}
 
-    repositories {
-        mavenCentral()
-    }
+repositories {
+    mavenCentral()
+}
 
-    dependencies {
-        // Lombok
-        compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
-        annotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
-        testCompileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
-        testAnnotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
+dependencies {
+    // Lombok
+    compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
+    annotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
+    testCompileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
+    testAnnotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.34'
 
-        // Logging
-        implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.13'
-        //TODO: this is only for testing, we should use something else than simple.
-        implementation group: 'org.slf4j', name: 'slf4j-simple', version: '2.0.13'
+    // Logging
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.13'
+    testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '2.0.13'
 
-        // Test
-        testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.10.3'
-        testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.10.3'
-    }
+    // HTTP
+    implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: '5.3.1'
 
-    test {
-        useJUnitPlatform()
-    }
+    // Test
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.10.3'
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.10.3'
+}
+
+test {
+    useJUnitPlatform()
 }
