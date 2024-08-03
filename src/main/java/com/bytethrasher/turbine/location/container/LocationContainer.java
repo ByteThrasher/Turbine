@@ -18,4 +18,6 @@ public interface LocationContainer {
     String grabLocation(String domain);
 
     String grabDomain();
+
+    boolean isEmpty();
 }

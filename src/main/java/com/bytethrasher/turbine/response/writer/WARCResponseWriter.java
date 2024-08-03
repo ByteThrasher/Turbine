@@ -13,7 +13,7 @@ public class WARCResponseWriter implements ResponseWriter {
 
     @Override
     @SneakyThrows
-    public void writeResponsesFromQueue(BlockingQueue<Response> queue) {
+    public void writeResponsesFromQueue(final BlockingQueue<Response> queue) {
         while (true) {
             final Response response = queue.take();
 

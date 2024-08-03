@@ -19,36 +19,47 @@ import java.util.concurrent.Semaphore;
  * Same stands for the {@link #registerLocations(LocationBatch)} method. It should only be called by the same thread or
  * a deadlock might occur.
  */
-@Builder
 public class DefaultLocationContainer implements LocationContainer {
 
     private final Map<String, List<String>> locations = new HashMap<>();
     private final List<String> availableDomains = new LinkedList<>();
 
-    private final Semaphore semaphore = new Semaphore(0);
+    private final int maximumLocationsUnderProcessing;
+    private final Semaphore semaphore;
 
-    @Builder.Default
-    private int actualLocationsUnderProcessing = 0;
+    @Builder
+    public DefaultLocationContainer(final int maximumLocationsUnderProcessing) {
+        this.maximumLocationsUnderProcessing = maximumLocationsUnderProcessing == 0
+                ? 10000 : maximumLocationsUnderProcessing;
 
-    @Builder.Default
-    private int maximumLocationsUnderProcessing = 10000;
+        semaphore = new Semaphore(this.maximumLocationsUnderProcessing);
+    }
 
     @Override
     @SneakyThrows
     public void registerLocations(final LocationBatch nextBatch) {
-        if (locations.containsKey(nextBatch.domain())) {
-            locations.get(nextBatch.domain()).addAll(nextBatch.locations());
+        if (nextBatch.locations().size() > maximumLocationsUnderProcessing) {
+            // TODO: Would be great if we could register locations one by one without creating an unnecessary list.
+            for (String location : nextBatch.locations()) {
+                final List<String> newList = new LinkedList<>();
+
+                newList.add(location);
+
+                registerLocations(new LocationBatch(nextBatch.domain(), newList));
+            }
         } else {
-            // The location provider should return a modifiable set by design!
-            locations.put(nextBatch.domain(), nextBatch.locations());
+            // We can still need to hold the locations in the memory if we have no place for them,
+            // but at least the thread is blocked from acquiring more.
+            semaphore.acquire(nextBatch.locations().size());
 
-            availableDomains.add(nextBatch.domain());
-        }
+            if (locations.containsKey(nextBatch.domain())) {
+                locations.get(nextBatch.domain()).addAll(nextBatch.locations());
+            } else {
+                // The location provider should return a modifiable set by design!
+                locations.put(nextBatch.domain(), nextBatch.locations());
 
-        actualLocationsUnderProcessing += nextBatch.locations().size();
-
-        if (actualLocationsUnderProcessing > maximumLocationsUnderProcessing) {
-            semaphore.acquire();
+                availableDomains.add(nextBatch.domain());
+            }
         }
     }
 
@@ -64,9 +75,7 @@ public class DefaultLocationContainer implements LocationContainer {
             locations.remove(domain);
         }
 
-        if (actualLocationsUnderProcessing < maximumLocationsUnderProcessing) {
-            semaphore.release();
-        }
+        semaphore.release(1);
 
         return location;
     }
@@ -78,5 +87,10 @@ public class DefaultLocationContainer implements LocationContainer {
         }
 
         return availableDomains.removeLast();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return locations.isEmpty();
     }
 }

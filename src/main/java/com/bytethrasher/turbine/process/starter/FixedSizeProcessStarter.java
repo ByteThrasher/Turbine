@@ -36,6 +36,8 @@ public class FixedSizeProcessStarter implements ProcessStarter {
     @Override
     @SneakyThrows
     public void waitUntilFinish() {
+        log.info("Waiting for processes to finish.");
+
         while (!threads.isEmpty()) {
             threads.removeIf(thread -> !thread.isAlive());
 
@@ -49,6 +51,8 @@ public class FixedSizeProcessStarter implements ProcessStarter {
     public void startProcess(final String domain, final LocationContainer locationContainer,
             final RequestHandler requestHandler, final ResponseHandler responseHandler,
             final BlockingQueue<Response> queue) {
+        log.info("Starting process to crawl domain: {}.", domain);
+
         threads.add(
                 Thread.ofVirtual()
                         .name(domain)

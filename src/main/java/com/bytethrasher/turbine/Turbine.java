@@ -64,24 +64,35 @@ public class Turbine {
 
         Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
 
-        // TODO: while not stopped/interrupted
-        while (true) {
-            final LocationBatch locationBatch = locationProvider.provideLocations();
+        boolean noMoreLocations = false;
 
-            if (locationBatch == null) {
-                processStarter.waitUntilFinish();
-                break;
+        Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
+            while (true) {
+                final LocationBatch locationBatch = locationProvider.provideLocations();
+
+                if (locationBatch == null) {
+                    break;
+                } else {
+                    // The location container will block the main thread if it overflows.
+                    locationContainer.registerLocations(locationBatch);
+                }
             }
+        });
 
-            // The location container will block the main thread if it overflows.
-            locationContainer.registerLocations(locationBatch);
+        while (true) {
+            if (!locationAcquiringThread.isAlive() && locationContainer.isEmpty()) {
+                processStarter.waitUntilFinish();
 
-            if (!processStarter.atProcessLimit()) {
-                final String domain = locationContainer.grabDomain();
+                log.info("Crawl finished! No more locations to process.");
+                break;
+            } else {
+                if (!processStarter.atProcessLimit()) {
+                    final String domain = locationContainer.grabDomain();
 
-                if (domain != null) {
-                    // TODO: Instead of passing the queue around, there should be an abstraction above it.
-                    processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
+                    if (domain != null) {
+                        // TODO: Instead of passing the queue around, there should be an abstraction above it.
+                        processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
+                    }
                 }
             }
         }
