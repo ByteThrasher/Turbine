@@ -10,6 +10,7 @@ import org.netpreserve.jwarc.WarcResponse;
 import org.netpreserve.jwarc.WarcWriter;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 
@@ -22,7 +23,7 @@ public class WARCResponseWriter implements ResponseWriter {
     @Builder
     @SneakyThrows
     public WARCResponseWriter() {
-        writer = new WarcWriter(System.out);
+        writer = new WarcWriter(Path.of(System.getProperty("user.dir")).resolve("result.warc"));
     }
 
     //TODO: Isn't it possible that the main thread shuts down faster than everything is written to file?
