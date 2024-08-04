@@ -15,18 +15,12 @@ import java.util.TreeSet;
 import java.util.concurrent.Semaphore;
 
 /**
- * This class holds the urls that should be visited by the crawling threads.
- * <p>
- * The {@link #grabLocation(String)} method for any given domain should only be called by the same thread every time.
- * Otherwise, a {@link java.util.ConcurrentModificationException} could occur.
- * <p>
- * Same stands for the {@link #registerLocations(LocationBatch)} method. It should only be called by the same thread or
- * a deadlock might occur.
+ * This class holds the locations (urls mostly) that should be visited by the crawling threads. It supports data access
+ * from multiple threads because that's required by the other parts of Turbine. Usually the new locations are being fed
+ * to the container by a dedicated thread while it's contents are being consumed by many crawler threads simultaneously.
  */
 public class DefaultLocationContainer implements LocationContainer {
 
-    //TODO: Synchronize all of these properly because all of them is used by the crawler and either the main or the
-    // url filler thread.
     private final Map<String, List<String>> locations = new HashMap<>();
     private final Set<String> underProcessingDomains = new TreeSet<>();
     private final List<String> availableDomains = new LinkedList<>();
@@ -57,57 +51,71 @@ public class DefaultLocationContainer implements LocationContainer {
             // but at least the thread is blocked from acquiring more.
             semaphore.acquire(nextBatch.locations().size());
 
-            if (locations.containsKey(nextBatch.domain())) {
-                locations.get(nextBatch.domain()).addAll(nextBatch.locations());
-            } else {
-                locations.put(nextBatch.domain(), new LinkedList<>(nextBatch.locations()));
+            synchronized (locations) {
+                if (locations.containsKey(nextBatch.domain())) {
+                    locations.get(nextBatch.domain()).addAll(nextBatch.locations());
+                } else {
+                    locations.put(nextBatch.domain(), new LinkedList<>(nextBatch.locations()));
 
-                if (!underProcessingDomains.contains(nextBatch.domain())) {
-                    availableDomains.add(nextBatch.domain());
+                    synchronized (underProcessingDomains) {
+                        if (!underProcessingDomains.contains(nextBatch.domain())) {
+                            synchronized (availableDomains) {
+                                availableDomains.add(nextBatch.domain());
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
     @Override
-    public String grabLocation(String domain) {
-        if (!locations.containsKey(domain)) {
-            return null;
+    public String grabLocation(final String domain) {
+        synchronized (locations) {
+            if (!locations.containsKey(domain)) {
+                return null;
+            }
+
+            final String location = locations.get(domain).removeFirst();
+
+            if (locations.get(domain).isEmpty()) {
+                locations.remove(domain);
+            }
+
+            semaphore.release(1);
+
+            return location;
         }
-
-        final String location = locations.get(domain).removeFirst();
-
-        if (locations.get(domain).isEmpty()) {
-            locations.remove(domain);
-        }
-
-        semaphore.release(1);
-
-        return location;
     }
 
     @Override
     public String allocateDomain() {
-        if (availableDomains.isEmpty()) {
-            return null;
+        synchronized (availableDomains) {
+            if (availableDomains.isEmpty()) {
+                return null;
+            }
+
+            final String allocatedDomain = availableDomains.removeLast();
+
+            synchronized (underProcessingDomains) {
+                underProcessingDomains.add(allocatedDomain);
+            }
+
+            return allocatedDomain;
         }
-
-        final String allocatedDomain = availableDomains.removeLast();
-
-        underProcessingDomains.add(allocatedDomain);
-
-        return allocatedDomain;
     }
 
     @Override
     public void deallocateDomain(final String domain) {
-        //TODO: This can cause some mess because it is being called by the workers. We should lock on the
-        // underProcessingDomains I guess.
-        underProcessingDomains.remove(domain);
+        synchronized (underProcessingDomains) {
+            underProcessingDomains.remove(domain);
+        }
     }
 
     @Override
     public boolean isEmpty() {
-        return locations.isEmpty();
+        synchronized (locations) {
+            return locations.isEmpty();
+        }
     }
 }
