@@ -2,9 +2,9 @@ package com.bytethrasher.turbine.location.provider.domain;
 
 import java.util.List;
 
-public record LocationBatch(
+public interface LocationBatch {
 
-        String domain,
-        List<String> locations
-) {
+    String domain();
+
+    List<String> locations();
 }

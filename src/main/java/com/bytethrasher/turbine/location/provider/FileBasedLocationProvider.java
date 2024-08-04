@@ -1,13 +1,12 @@
 package com.bytethrasher.turbine.location.provider;
 
-import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
+import com.bytethrasher.turbine.location.provider.domain.DefaultLocationBatch;
 import com.bytethrasher.turbine.url.URLParser;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
 import java.io.BufferedReader;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedList;
@@ -29,7 +28,7 @@ public class FileBasedLocationProvider implements LocationProvider {
 
     @Override
     @SneakyThrows
-    public LocationBatch provideLocations() {
+    public DefaultLocationBatch provideLocations() {
         if (lastLine == null) {
             // Terminating the provider
             return null;
@@ -54,6 +53,6 @@ public class FileBasedLocationProvider implements LocationProvider {
             actualDomain = urlParser.parseDomain(lastLine);
         }
 
-        return new LocationBatch(domain, locations);
+        return new DefaultLocationBatch(domain, locations);
     }
 }

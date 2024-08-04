@@ -1,6 +1,8 @@
 package com.bytethrasher.turbine.location.container;
 
+import com.bytethrasher.turbine.location.provider.domain.DefaultLocationBatch;
 import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
+import com.bytethrasher.turbine.util.collection.PartitionList;
 import lombok.Builder;
 import lombok.SneakyThrows;
 
@@ -23,6 +25,8 @@ import java.util.concurrent.Semaphore;
  */
 public class DefaultLocationContainer implements LocationContainer {
 
+    //TODO: Synchronize all of these properly because all of them is used by the crawler and either the main or the
+    // url filler thread.
     private final Map<String, List<String>> locations = new HashMap<>();
     private final Set<String> underProcessingDomains = new TreeSet<>();
     private final List<String> availableDomains = new LinkedList<>();
@@ -42,14 +46,12 @@ public class DefaultLocationContainer implements LocationContainer {
     @SneakyThrows
     public void registerLocations(final LocationBatch nextBatch) {
         if (nextBatch.locations().size() > maximumLocationsUnderProcessing) {
-            // TODO: Would be great if we could register locations one by one without creating an unnecessary list.
-            for (String location : nextBatch.locations()) {
-                final List<String> newList = new LinkedList<>();
+            final int partialBatchSize = Math.max(maximumLocationsUnderProcessing / 2, 1);
+            final List<List<String>> partialLocationBatches = new PartitionList<>(
+                    nextBatch.locations(), partialBatchSize);
 
-                newList.add(location);
-
-                registerLocations(new LocationBatch(nextBatch.domain(), newList));
-            }
+            partialLocationBatches.forEach(list ->
+                    registerLocations(new DefaultLocationBatch(nextBatch.domain(), list)));
         } else {
             // We can still need to hold the locations in the memory if we have no place for them,
             // but at least the thread is blocked from acquiring more.
@@ -58,9 +60,7 @@ public class DefaultLocationContainer implements LocationContainer {
             if (locations.containsKey(nextBatch.domain())) {
                 locations.get(nextBatch.domain()).addAll(nextBatch.locations());
             } else {
-                // TODO: Why thoug? We should just create our won set and copy everything...
-                // The location provider should return a modifiable set by design!
-                locations.put(nextBatch.domain(), nextBatch.locations());
+                locations.put(nextBatch.domain(), new LinkedList<>(nextBatch.locations()));
 
                 if (!underProcessingDomains.contains(nextBatch.domain())) {
                     availableDomains.add(nextBatch.domain());
@@ -75,7 +75,7 @@ public class DefaultLocationContainer implements LocationContainer {
             return null;
         }
 
-        String location = locations.get(domain).removeFirst();
+        final String location = locations.get(domain).removeFirst();
 
         if (locations.get(domain).isEmpty()) {
             locations.remove(domain);
@@ -92,8 +92,10 @@ public class DefaultLocationContainer implements LocationContainer {
             return null;
         }
 
-        String allocatedDomain = availableDomains.removeLast();
+        final String allocatedDomain = availableDomains.removeLast();
+
         underProcessingDomains.add(allocatedDomain);
+
         return allocatedDomain;
     }
 

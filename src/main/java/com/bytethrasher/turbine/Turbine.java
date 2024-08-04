@@ -4,7 +4,7 @@ import com.bytethrasher.turbine.location.container.DefaultLocationContainer;
 import com.bytethrasher.turbine.location.container.LocationContainer;
 import com.bytethrasher.turbine.location.provider.FileBasedLocationProvider;
 import com.bytethrasher.turbine.location.provider.LocationProvider;
-import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
+import com.bytethrasher.turbine.location.provider.domain.DefaultLocationBatch;
 import com.bytethrasher.turbine.process.starter.FixedSizeProcessStarter;
 import com.bytethrasher.turbine.process.starter.ProcessStarter;
 import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandler;
@@ -67,7 +67,7 @@ public class Turbine {
 
             Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
                 while (true) {
-                    final LocationBatch locationBatch = locationProvider.provideLocations();
+                    final DefaultLocationBatch locationBatch = locationProvider.provideLocations();
 
                     if (locationBatch == null) {
                         break;
