@@ -29,13 +29,21 @@ public class DefaultLocationContainer implements LocationContainer {
     private final Semaphore semaphore;
 
     @Builder
-    public DefaultLocationContainer(final int maximumLocationsUnderProcessing) {
-        this.maximumLocationsUnderProcessing = maximumLocationsUnderProcessing == 0
-                ? 10000 : maximumLocationsUnderProcessing;
+    public DefaultLocationContainer(final int maximumLocationsWaitingForProcessing) {
+        this.maximumLocationsUnderProcessing = maximumLocationsWaitingForProcessing == 0
+                ? 10000 : maximumLocationsWaitingForProcessing;
 
         semaphore = new Semaphore(this.maximumLocationsUnderProcessing);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The method supports the registering of more than the {@link #maximumLocationsUnderProcessing} of locations in
+     * one go. In this case the provided locations will be made available in smaller batches.
+     *
+     * @param nextBatch the next batch of locations to register in the container
+     */
     @Override
     @SneakyThrows
     public void registerLocations(final LocationBatch nextBatch) {
