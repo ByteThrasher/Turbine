@@ -9,6 +9,7 @@ import org.netpreserve.jwarc.MediaType;
 import org.netpreserve.jwarc.WarcResponse;
 import org.netpreserve.jwarc.WarcWriter;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 
@@ -47,5 +48,10 @@ public class WARCResponseWriter implements ResponseWriter {
                     .build();
             writer.write(warcResponseRecord);
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        writer.close();
     }
 }

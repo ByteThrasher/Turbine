@@ -58,41 +58,45 @@ public class Turbine {
 
     @SneakyThrows
     public void start() {
-        log.info("Starting the turbine engine.");
+        try {
+            log.info("Starting the turbine engine.");
 
-        final BoundedPriorityBlockingQueue<Response> queue = new BoundedPriorityBlockingQueue<>(queueCapacity);
+            final BoundedPriorityBlockingQueue<Response> queue = new BoundedPriorityBlockingQueue<>(queueCapacity);
 
-        Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
+            Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
 
-        Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
+            Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
+                while (true) {
+                    final LocationBatch locationBatch = locationProvider.provideLocations();
+
+                    if (locationBatch == null) {
+                        break;
+                    } else {
+                        // The location container will block the main thread if it overflows.
+                        locationContainer.registerLocations(locationBatch);
+                    }
+                }
+            });
+
             while (true) {
-                final LocationBatch locationBatch = locationProvider.provideLocations();
+                if (!locationAcquiringThread.isAlive() && locationContainer.isEmpty()) {
+                    processStarter.waitUntilFinish();
 
-                if (locationBatch == null) {
+                    log.info("Crawl finished! No more locations to process.");
                     break;
                 } else {
-                    // The location container will block the main thread if it overflows.
-                    locationContainer.registerLocations(locationBatch);
-                }
-            }
-        });
+                    if (!processStarter.atProcessLimit()) {
+                        final String domain = locationContainer.grabDomain();
 
-        while (true) {
-            if (!locationAcquiringThread.isAlive() && locationContainer.isEmpty()) {
-                processStarter.waitUntilFinish();
-
-                log.info("Crawl finished! No more locations to process.");
-                break;
-            } else {
-                if (!processStarter.atProcessLimit()) {
-                    final String domain = locationContainer.grabDomain();
-
-                    if (domain != null) {
-                        // TODO: Instead of passing the queue around, there should be an abstraction above it.
-                        processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
+                        if (domain != null) {
+                            // TODO: Instead of passing the queue around, there should be an abstraction above it.
+                            processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
+                        }
                     }
                 }
             }
+        } finally {
+            responseWriter.close();
         }
     }
 }
