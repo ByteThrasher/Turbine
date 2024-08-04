@@ -12,7 +12,7 @@ public class SimpleTest {
         final Turbine turbine = Turbine.builder()
                 .locationContainer(
                         DefaultLocationContainer.builder()
-                                .maximumLocationsUnderProcessing(1)
+                                .maximumLocationsWaitingForProcessing(1)
                                 .build()
                 )
                 .processStarter(

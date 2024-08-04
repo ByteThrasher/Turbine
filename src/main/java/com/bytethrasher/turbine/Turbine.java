@@ -9,6 +9,7 @@ import com.bytethrasher.turbine.process.starter.FixedSizeProcessStarter;
 import com.bytethrasher.turbine.process.starter.ProcessStarter;
 import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandler;
 import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.domain.DefaultResponse;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import com.bytethrasher.turbine.response.writer.ResponseWriter;

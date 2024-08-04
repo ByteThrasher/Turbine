@@ -1,5 +1,8 @@
 package com.bytethrasher.turbine.request;
 
+import com.bytethrasher.turbine.request.domain.DefaultHeader;
+import com.bytethrasher.turbine.request.domain.DefaultResponse;
+import com.bytethrasher.turbine.request.domain.Header;
 import com.bytethrasher.turbine.request.domain.Response;
 import lombok.Builder;
 import lombok.SneakyThrows;
@@ -27,7 +30,19 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
     @Override
     @SneakyThrows //TODO: This SneakyThrows can be very bad here (kill the app)
     public Response doRequest(final String location) {
-        return httpClient.execute(new HttpGet(location), response ->
-                new Response(response.getCode(), EntityUtils.toByteArray(response.getEntity())));
+        return httpClient.execute(new HttpGet(location), response -> {
+                    final Header[] headers = new Header[response.getHeaders().length];
+
+                    for (int i = 0; i < response.getHeaders().length; i++) {
+                        final org.apache.hc.core5.http.Header header = response.getHeaders()[i];
+
+                        headers[i] = new DefaultHeader(header.getName(), header.getValue());
+                    }
+
+                    return new DefaultResponse(location, response.getCode(),
+                            EntityUtils.toByteArray(response.getEntity()), headers,
+                            response.getEntity().getContentType(), response.getReasonPhrase());
+                }
+        );
     }
 }

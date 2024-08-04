@@ -1,15 +1,16 @@
 package com.bytethrasher.turbine.request.domain;
 
-public record Response(
+public interface Response extends Comparable<Response> {
 
-        int statusCode,
-        byte[] content
-        // TODO: Headers, etc.
-) implements Comparable<Response> {
+    String location();
 
-    @Override
-    public int compareTo(final Response o) {
-        // TODO: handle null
-        return this.content.length - o.content.length;
-    }
+    int statusCode();
+
+    byte[] body();
+
+    Header[] headers();
+
+    String contentType();
+
+    String reason();
 }

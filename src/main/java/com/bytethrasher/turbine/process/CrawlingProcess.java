@@ -2,6 +2,7 @@ package com.bytethrasher.turbine.process;
 
 import com.bytethrasher.turbine.location.container.LocationContainer;
 import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.domain.DefaultResponse;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import lombok.RequiredArgsConstructor;

@@ -1,5 +1,7 @@
 package com.bytethrasher.turbine.response.writer;
 
+import com.bytethrasher.turbine.request.domain.DefaultResponse;
+import com.bytethrasher.turbine.request.domain.Header;
 import com.bytethrasher.turbine.request.domain.Response;
 import lombok.Builder;
 import lombok.SneakyThrows;
@@ -33,21 +35,20 @@ public class WARCResponseWriter implements ResponseWriter {
         while (true) {
             final Response response = queue.take();
 
-            // TODO: Save request as well
-
-            WarcResponse warcResponseRecord = new WarcResponse.Builder("asd")
+            final WarcResponse.Builder warcResponseRecordBuilder = new WarcResponse.Builder(response.location())
                     .date(Instant.now())
                     .body(
                             //TODO: Support reason
-                            new HttpResponse.Builder(response.statusCode(), "asd")
-                                    //TODO: Support media type
-                                    .body(MediaType.parse("application/html"), response.content())
+                            new HttpResponse.Builder(response.statusCode(), response.reason())
+                                    .body(MediaType.parse(response.contentType()), response.body())
                                     .build()
-                    )
-                    // TODO concurrentTo
-                    //.concurrentTo(request.id())
-                    .build();
-            writer.write(warcResponseRecord);
+                    );
+
+            for (Header header : response.headers()) {
+                warcResponseRecordBuilder.addHeader(header.name(), header.value());
+            }
+
+            writer.write(warcResponseRecordBuilder.build());
         }
     }
 
