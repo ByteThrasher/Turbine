@@ -86,7 +86,7 @@ public class Turbine {
                     break;
                 } else {
                     if (!processStarter.atProcessLimit()) {
-                        final String domain = locationContainer.grabDomain();
+                        final String domain = locationContainer.allocateDomain();
 
                         if (domain != null) {
                             // TODO: Instead of passing the queue around, there should be an abstraction above it.

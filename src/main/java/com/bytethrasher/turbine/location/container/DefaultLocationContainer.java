@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -22,6 +24,7 @@ import java.util.concurrent.Semaphore;
 public class DefaultLocationContainer implements LocationContainer {
 
     private final Map<String, List<String>> locations = new HashMap<>();
+    private final Set<String> underProcessingDomains = new TreeSet<>();
     private final List<String> availableDomains = new LinkedList<>();
 
     private final int maximumLocationsUnderProcessing;
@@ -55,10 +58,13 @@ public class DefaultLocationContainer implements LocationContainer {
             if (locations.containsKey(nextBatch.domain())) {
                 locations.get(nextBatch.domain()).addAll(nextBatch.locations());
             } else {
+                // TODO: Why thoug? We should just create our won set and copy everything...
                 // The location provider should return a modifiable set by design!
                 locations.put(nextBatch.domain(), nextBatch.locations());
 
-                availableDomains.add(nextBatch.domain());
+                if (!underProcessingDomains.contains(nextBatch.domain())) {
+                    availableDomains.add(nextBatch.domain());
+                }
             }
         }
     }
@@ -81,12 +87,21 @@ public class DefaultLocationContainer implements LocationContainer {
     }
 
     @Override
-    public String grabDomain() {
+    public String allocateDomain() {
         if (availableDomains.isEmpty()) {
             return null;
         }
 
-        return availableDomains.removeLast();
+        String allocatedDomain = availableDomains.removeLast();
+        underProcessingDomains.add(allocatedDomain);
+        return allocatedDomain;
+    }
+
+    @Override
+    public void deallocateDomain(final String domain) {
+        //TODO: This can cause some mess because it is being called by the workers. We should lock on the
+        // underProcessingDomains I guess.
+        underProcessingDomains.remove(domain);
     }
 
     @Override

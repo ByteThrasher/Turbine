@@ -17,7 +17,9 @@ public interface LocationContainer {
      */
     String grabLocation(String domain);
 
-    String grabDomain();
+    String allocateDomain();
+
+    void deallocateDomain(String domain);
 
     boolean isEmpty();
 }

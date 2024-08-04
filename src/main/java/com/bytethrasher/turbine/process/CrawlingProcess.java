@@ -35,5 +35,7 @@ public class CrawlingProcess implements Runnable {
 
             location = locationContainer.grabLocation(domain);
         } while (location != null);
+
+        locationContainer.deallocateDomain(domain);
     }
 }
