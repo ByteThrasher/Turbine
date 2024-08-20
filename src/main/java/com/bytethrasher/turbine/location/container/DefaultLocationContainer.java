@@ -9,8 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
@@ -22,9 +20,7 @@ import java.util.concurrent.Semaphore;
 @Slf4j
 public class DefaultLocationContainer implements LocationContainer {
 
-    private final ConcurrentHashMap<String, List<String>> locations = new ConcurrentHashMap<>();
-    private final Set<String> underProcessingDomains = new TreeSet<>();
-    private final List<String> availableDomains = new LinkedList<>();
+    private final ConcurrentHashMap<String, DomainWorkUnit> locations = new ConcurrentHashMap<>();
 
     private final int maximumLocationsUnderProcessing;
     private final Semaphore semaphore;
@@ -64,19 +60,9 @@ public class DefaultLocationContainer implements LocationContainer {
             // but at least the thread is blocked from acquiring more.
             semaphore.acquire(nextBatch.locations().size());
 
-            locations.merge(nextBatch.domain(), new LinkedList<>(nextBatch.locations()),
+            locations.merge(nextBatch.domain(), new DomainWorkUnit(nextBatch.domain(), nextBatch.locations()),
                     (oldValue, newValue) -> {
-                        oldValue.addAll(newValue);
-
-                        // TODO: Not at all optimal doing this in here, but at least it is logically correct and doesn't
-                        // cause a deadlock.
-                        synchronized (underProcessingDomains) {
-                            if (!underProcessingDomains.contains(nextBatch.domain())) {
-                                synchronized (availableDomains) {
-                                    availableDomains.add(nextBatch.domain());
-                                }
-                            }
-                        }
+                        oldValue.locations.addAll(newValue.locations);
 
                         return oldValue;
                     });
@@ -92,9 +78,9 @@ public class DefaultLocationContainer implements LocationContainer {
                 return null;
             }
 
-            final String location = locations.get(domain).removeFirst();
+            final String location = locations.get(domain).locations.removeFirst();
 
-            if (locations.get(domain).isEmpty()) {
+            if (locations.get(domain).locations.isEmpty()) {
                 locations.remove(domain);
             }
 
@@ -108,27 +94,21 @@ public class DefaultLocationContainer implements LocationContainer {
     public String allocateDomain() {
         log.debug("Allocating domain.");
 
-        synchronized (availableDomains) {
-            if (availableDomains.isEmpty()) {
+        synchronized (locations) {
+            if (locations.isEmpty()) {
                 return null;
             }
 
-            final String allocatedDomain = availableDomains.removeLast();
+            for (DomainWorkUnit domainWorkUnit : locations.values()) {
+                if (!domainWorkUnit.underProcessing) {
+                    domainWorkUnit.underProcessing = true;
 
-            synchronized (underProcessingDomains) {
-                underProcessingDomains.add(allocatedDomain);
+                    return domainWorkUnit.domain;
+                }
             }
 
-            return allocatedDomain;
-        }
-    }
-
-    @Override
-    public void deallocateDomain(final String domain) {
-        log.debug("Deallocating domain: {}.", domain);
-
-        synchronized (underProcessingDomains) {
-            underProcessingDomains.remove(domain);
+            // No unallocated domain was found.
+            return null;
         }
     }
 
@@ -145,5 +125,19 @@ public class DefaultLocationContainer implements LocationContainer {
         synchronized (locations) {
             return locations.isEmpty();
         }
+    }
+
+    private static class DomainWorkUnit {
+
+        private final String domain;
+        private final List<String> locations = new LinkedList<>();
+
+        public DomainWorkUnit(final String domain, final List<String> locations) {
+            this.domain = domain;
+
+            this.locations.addAll(locations);
+        }
+
+        private boolean underProcessing = false;
     }
 }

@@ -28,8 +28,6 @@ public interface LocationContainer {
 
     String allocateDomain();
 
-    void deallocateDomain(String domain);
-
     void dropDomain(String domain);
 
     boolean isEmpty();

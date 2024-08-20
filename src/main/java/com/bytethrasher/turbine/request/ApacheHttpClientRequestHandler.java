@@ -6,11 +6,15 @@ import com.bytethrasher.turbine.request.domain.Header;
 import com.bytethrasher.turbine.request.domain.Response;
 import lombok.Builder;
 import lombok.SneakyThrows;
+import org.apache.hc.client5.http.HttpHostConnectException;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.http.NoHttpResponseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 
 public class ApacheHttpClientRequestHandler implements RequestHandler {
 
@@ -46,10 +50,14 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
                                 response.getEntity().getContentType(), response.getReasonPhrase());
                     }
             );
-        } catch (final NoHttpResponseException e) {
+        } catch (final SocketTimeoutException e) {
+            // TODO: retry
+            return null;
+        } catch (final NoHttpResponseException | HttpHostConnectException | UnknownHostException e) {
             // The server failed to respond with anything meaningful. Let's return a poison pill so we doesn't process
             // any of the other locations from this domain.
-            // TODO: Why null? Other than it's faster to return than throwing an exception.
+            // TODO: Why null? Other than it's faster to return than throwing an exception. We need to return with a
+            //  proper exception though.
             return null;
         }
     }
