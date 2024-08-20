@@ -1,6 +1,5 @@
 package com.bytethrasher.turbine.response.writer;
 
-import com.bytethrasher.turbine.request.domain.DefaultResponse;
 import com.bytethrasher.turbine.request.domain.Header;
 import com.bytethrasher.turbine.request.domain.Response;
 import lombok.Builder;
@@ -40,7 +39,7 @@ public class WARCResponseWriter implements ResponseWriter {
                     .body(
                             //TODO: Support reason
                             new HttpResponse.Builder(response.statusCode(), response.reason())
-                                    .body(MediaType.parse(response.contentType()), response.body())
+                                    .body(buildMediaType(response.contentType()), response.body())
                                     .build()
                     );
 
@@ -49,6 +48,16 @@ public class WARCResponseWriter implements ResponseWriter {
             }
 
             writer.write(warcResponseRecordBuilder.build());
+        }
+    }
+
+    private MediaType buildMediaType(final String contentType) {
+        try {
+            return contentType == null ? null : MediaType.parse(contentType);
+        } catch (final IllegalArgumentException e) {
+            // An IllegalArgumentException is thrown when the media type is not parsable. This happens when the server
+            //  on the other end returns garbage.
+            return null;
         }
     }
 

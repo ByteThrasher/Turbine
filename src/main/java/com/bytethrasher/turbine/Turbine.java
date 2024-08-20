@@ -9,7 +9,6 @@ import com.bytethrasher.turbine.process.starter.FixedSizeProcessStarter;
 import com.bytethrasher.turbine.process.starter.ProcessStarter;
 import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandler;
 import com.bytethrasher.turbine.request.RequestHandler;
-import com.bytethrasher.turbine.request.domain.DefaultResponse;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import com.bytethrasher.turbine.response.writer.ResponseWriter;
@@ -66,18 +65,20 @@ public class Turbine {
 
             Thread.startVirtualThread(() -> responseWriter.writeResponsesFromQueue(queue));
 
-            Thread locationAcquiringThread = Thread.startVirtualThread(() -> {
-                while (true) {
-                    final DefaultLocationBatch locationBatch = locationProvider.provideLocations();
+            Thread locationAcquiringThread = Thread.ofVirtual()
+                    .name("turbine-writer-thread")
+                    .start(() -> {
+                        while (true) {
+                            final DefaultLocationBatch locationBatch = locationProvider.provideLocations();
 
-                    if (locationBatch == null) {
-                        break;
-                    } else {
-                        // The location container will block the main thread if it overflows.
-                        locationContainer.registerLocations(locationBatch);
-                    }
-                }
-            });
+                            if (locationBatch == null) {
+                                break;
+                            } else {
+                                // The location container will block the main thread if it overflows.
+                                locationContainer.registerLocations(locationBatch);
+                            }
+                        }
+                    });
 
             while (true) {
                 if (!locationAcquiringThread.isAlive() && locationContainer.isEmpty()) {

@@ -55,7 +55,7 @@ public class FixedSizeProcessStarter implements ProcessStarter {
 
         threads.add(
                 Thread.ofVirtual()
-                        .name(domain)
+                        .name("turbine-crawler-" + domain)
                         // TODO: I think the response handler should come from outside as well...
                         .start(new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandler, responseHandler, queue))
         );

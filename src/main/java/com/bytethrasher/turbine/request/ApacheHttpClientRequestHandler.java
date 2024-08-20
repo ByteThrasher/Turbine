@@ -10,9 +10,20 @@ import org.apache.hc.client5.http.HttpHostConnectException;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.socket.ConnectionSocketFactory;
+import org.apache.hc.client5.http.socket.PlainConnectionSocketFactory;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.http.NoHttpResponseException;
+import org.apache.hc.core5.http.config.Registry;
+import org.apache.hc.core5.http.config.RegistryBuilder;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.ssl.SSLContexts;
+import org.apache.hc.core5.ssl.TrustStrategy;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
@@ -24,10 +35,31 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
     private final HttpClient httpClient;
 
     @Builder
+    @SneakyThrows
     public ApacheHttpClientRequestHandler(final String userAgent) {
         final String realUserAgent = userAgent == null ? DEFAULT_USER_AGENT : userAgent;
 
+        final TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
+        final SSLContext sslContext = SSLContexts.custom()
+                .loadTrustMaterial(null, acceptingTrustStrategy)
+                .build();
+        final SSLConnectionSocketFactory sslsf =
+                new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+        final Registry<ConnectionSocketFactory> socketFactoryRegistry =
+                RegistryBuilder.<ConnectionSocketFactory>create()
+                        .register("https", sslsf)
+                        .register("http", new PlainConnectionSocketFactory())
+                        .build();
+
+        final PoolingHttpClientConnectionManager connectionManager =
+                new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+
         httpClient = HttpClientBuilder.create()
+                // TODO: The connection manager above is created to allow connections to unverified SSL hosts which
+                //  might not be the desired behaviour by every caller. We need to add a flag like
+                //  "thrustAllCertificates" or something similar.
+                //  See: https://www.baeldung.com/httpclient-ssl#ssl_config
+                .setConnectionManager(connectionManager)
                 .setUserAgent(realUserAgent)
                 .build();
     }
@@ -50,7 +82,7 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
                                 response.getEntity().getContentType(), response.getReasonPhrase());
                     }
             );
-        } catch (final SocketTimeoutException e) {
+        } catch (final SocketTimeoutException | SSLHandshakeException e) {
             // TODO: retry
             return null;
         } catch (final NoHttpResponseException | HttpHostConnectException | UnknownHostException e) {

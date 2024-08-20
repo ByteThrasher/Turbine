@@ -5,6 +5,7 @@ import com.bytethrasher.turbine.url.URLParser;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
 import java.nio.file.Files;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 
+@Slf4j
 public class FileBasedLocationProvider implements LocationProvider {
 
     private final URLParser urlParser = new URLParser();
@@ -30,7 +32,7 @@ public class FileBasedLocationProvider implements LocationProvider {
     @SneakyThrows
     public DefaultLocationBatch provideLocations() {
         if (lastLine == null) {
-            // Terminating the provider
+            // Terminating the provider.
             return null;
         }
 
@@ -40,11 +42,18 @@ public class FileBasedLocationProvider implements LocationProvider {
 
         String actualDomain = domain;
 
-        while (actualDomain.equals(domain)) {
-            locations.add(lastLine);
+        // The actualDomain can be null if the host can't be parsed from the URL aka location.
+        while (actualDomain == null || actualDomain.equals(domain)) {
+            // We don't want to handle locations without a host.
+            if (actualDomain != null) {
+                locations.add(lastLine);
+            } else {
+                log.info("Skipping url because there is no parsable domain: {}.", lastLine);
+            }
 
             lastLine = locationReader.readLine();
 
+            // If lastLine is null then we reached the end of the file.
             if (lastLine == null) {
                 locationReader.close();
                 break;
