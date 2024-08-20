@@ -24,4 +24,22 @@ public class SimpleTest {
 
         turbine.start();
     }
+
+    @Test
+    public void fastTest() {
+        final Turbine turbine = Turbine.builder()
+                .locationContainer(
+                        DefaultLocationContainer.builder()
+                                .maximumLocationsWaitingForProcessing(10000)
+                                .build()
+                )
+                .processStarter(
+                        FixedSizeProcessStarter.builder()
+                                .threadLimit(50)
+                                .build()
+                )
+                .build();
+
+        turbine.start();
+    }
 }

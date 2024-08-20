@@ -5,13 +5,13 @@ import com.bytethrasher.turbine.location.provider.domain.LocationBatch;
 import com.bytethrasher.turbine.util.collection.PartitionList;
 import lombok.Builder;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -19,9 +19,10 @@ import java.util.concurrent.Semaphore;
  * from multiple threads because that's required by the other parts of Turbine. Usually the new locations are being fed
  * to the container by a dedicated thread while it's contents are being consumed by many crawler threads simultaneously.
  */
+@Slf4j
 public class DefaultLocationContainer implements LocationContainer {
 
-    private final Map<String, List<String>> locations = new HashMap<>();
+    private final ConcurrentHashMap<String, List<String>> locations = new ConcurrentHashMap<>();
     private final Set<String> underProcessingDomains = new TreeSet<>();
     private final List<String> availableDomains = new LinkedList<>();
 
@@ -48,6 +49,8 @@ public class DefaultLocationContainer implements LocationContainer {
     @SneakyThrows
     public void registerLocations(final LocationBatch nextBatch) {
         if (nextBatch.locations().size() > maximumLocationsUnderProcessing) {
+            log.debug("Too big batch to register! Splitting it up.");
+
             final int partialBatchSize = Math.max(maximumLocationsUnderProcessing / 2, 1);
             final List<List<String>> partialLocationBatches = new PartitionList<>(
                     nextBatch.locations(), partialBatchSize);
@@ -55,31 +58,36 @@ public class DefaultLocationContainer implements LocationContainer {
             partialLocationBatches.forEach(list ->
                     registerLocations(new DefaultLocationBatch(nextBatch.domain(), list)));
         } else {
+            log.debug("Registering batch for domain: {}.", nextBatch.domain());
+
             // We can still need to hold the locations in the memory if we have no place for them,
             // but at least the thread is blocked from acquiring more.
             semaphore.acquire(nextBatch.locations().size());
 
-            synchronized (locations) {
-                if (locations.containsKey(nextBatch.domain())) {
-                    locations.get(nextBatch.domain()).addAll(nextBatch.locations());
-                } else {
-                    locations.put(nextBatch.domain(), new LinkedList<>(nextBatch.locations()));
+            locations.merge(nextBatch.domain(), new LinkedList<>(nextBatch.locations()),
+                    (oldValue, newValue) -> {
+                        oldValue.addAll(newValue);
 
-                    synchronized (underProcessingDomains) {
-                        if (!underProcessingDomains.contains(nextBatch.domain())) {
-                            synchronized (availableDomains) {
-                                availableDomains.add(nextBatch.domain());
+                        // TODO: Not at all optimal doing this in here, but at least it is logically correct and doesn't
+                        // cause a deadlock.
+                        synchronized (underProcessingDomains) {
+                            if (!underProcessingDomains.contains(nextBatch.domain())) {
+                                synchronized (availableDomains) {
+                                    availableDomains.add(nextBatch.domain());
+                                }
                             }
                         }
-                    }
-                }
-            }
+
+                        return oldValue;
+                    });
         }
     }
 
     @Override
     public String grabLocation(final String domain) {
         synchronized (locations) {
+            log.debug("Grabbing location for domain: {}.", domain);
+
             if (!locations.containsKey(domain)) {
                 return null;
             }
@@ -98,6 +106,8 @@ public class DefaultLocationContainer implements LocationContainer {
 
     @Override
     public String allocateDomain() {
+        log.debug("Allocating domain.");
+
         synchronized (availableDomains) {
             if (availableDomains.isEmpty()) {
                 return null;
@@ -115,9 +125,19 @@ public class DefaultLocationContainer implements LocationContainer {
 
     @Override
     public void deallocateDomain(final String domain) {
+        log.debug("Deallocating domain: {}.", domain);
+
         synchronized (underProcessingDomains) {
             underProcessingDomains.remove(domain);
         }
+    }
+
+    @Override
+    public void dropDomain(final String domain) {
+        log.debug("Dropping domain: {}.", domain);
+
+        locations.entrySet()
+                .removeIf(entry -> entry.getKey().equals(domain));
     }
 
     @Override

@@ -27,16 +27,31 @@ public class CrawlingProcess implements Runnable {
     public void run() {
         String location = locationContainer.grabLocation(domain);
 
-        do {
-            log.info("Crawling location: {}.", location);
+        try {
+            do {
+                log.info("Crawling location: {}.", location);
 
-            responseHandler.handleResponse(requestHandler.doRequest(location), queue);
+                final Response response = requestHandler.doRequest(location);
 
-            Thread.sleep(crawlDelay);
+                if (response != null) {
+                    responseHandler.handleResponse(response, queue);
 
-            location = locationContainer.grabLocation(domain);
-        } while (location != null);
+                    Thread.sleep(crawlDelay);
 
-        locationContainer.deallocateDomain(domain);
+                    location = locationContainer.grabLocation(domain);
+                } else {
+                    //TODO: It would be good if we could cache the bad domains for at least a hour or smthing
+
+                    // The domain is an invalid one. Either it doesn't exist or a server doesn't respond with anything
+                    // meaningful on hte other end. Let's drop all the locations we intended to crawl on it and just
+                    // carry on.
+                    locationContainer.dropDomain(domain);
+                    break;
+                }
+            } while (location != null);
+        } finally {
+            // No matter what, the domain should be deallocated. Otherwise we will run into deadlocks.
+            locationContainer.deallocateDomain(domain);
+        }
     }
 }

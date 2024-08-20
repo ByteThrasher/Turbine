@@ -9,6 +9,7 @@ import lombok.SneakyThrows;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.NoHttpResponseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 
 public class ApacheHttpClientRequestHandler implements RequestHandler {
@@ -30,19 +31,26 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
     @Override
     @SneakyThrows //TODO: This SneakyThrows can be very bad here (kill the app)
     public Response doRequest(final String location) {
-        return httpClient.execute(new HttpGet(location), response -> {
-                    final Header[] headers = new Header[response.getHeaders().length];
+        try {
+            return httpClient.execute(new HttpGet(location), response -> {
+                        final Header[] headers = new Header[response.getHeaders().length];
 
-                    for (int i = 0; i < response.getHeaders().length; i++) {
-                        final org.apache.hc.core5.http.Header header = response.getHeaders()[i];
+                        for (int i = 0; i < response.getHeaders().length; i++) {
+                            final org.apache.hc.core5.http.Header header = response.getHeaders()[i];
 
-                        headers[i] = new DefaultHeader(header.getName(), header.getValue());
+                            headers[i] = new DefaultHeader(header.getName(), header.getValue());
+                        }
+
+                        return new DefaultResponse(location, response.getCode(),
+                                EntityUtils.toByteArray(response.getEntity()), headers,
+                                response.getEntity().getContentType(), response.getReasonPhrase());
                     }
-
-                    return new DefaultResponse(location, response.getCode(),
-                            EntityUtils.toByteArray(response.getEntity()), headers,
-                            response.getEntity().getContentType(), response.getReasonPhrase());
-                }
-        );
+            );
+        } catch (final NoHttpResponseException e) {
+            // The server failed to respond with anything meaningful. Let's return a poison pill so we doesn't process
+            // any of the other locations from this domain.
+            // TODO: Why null? Other than it's faster to return than throwing an exception.
+            return null;
+        }
     }
 }
