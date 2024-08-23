@@ -9,7 +9,7 @@ import java.util.concurrent.BlockingQueue;
 
 public interface ProcessStarter {
 
-    boolean atProcessLimit();
+    void waitForFreeSpace();
 
     void waitUntilFinish();
 

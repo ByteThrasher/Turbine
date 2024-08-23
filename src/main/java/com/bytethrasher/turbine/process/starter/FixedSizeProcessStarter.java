@@ -6,45 +6,38 @@ import com.bytethrasher.turbine.request.RequestHandler;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import lombok.Builder;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
 
 @Slf4j
-@Builder
 public class FixedSizeProcessStarter implements ProcessStarter {
 
-    @Builder.Default
-    private final int threadLimit = 10;
+    private final int crawlDelay;
+    private final int threadLimit;
 
-    @Builder.Default
-    private final int crawlDelay = 1000;
+    private final Semaphore semaphore;
 
-    private final List<Thread> threads = new LinkedList<>();
+    @Builder
+    public FixedSizeProcessStarter(int threadLimit, int crawlDelay) {
+        this.threadLimit = threadLimit == 0 ? 10 : threadLimit;
+        this.crawlDelay = crawlDelay == 0 ? 1000 : crawlDelay;
 
-    @Override
-    public boolean atProcessLimit() {
-        // Remove dead threads
-        threads.removeIf(thread -> !thread.isAlive());
-
-        return threads.size() >= threadLimit;
+        semaphore = new Semaphore(threadLimit);
     }
 
     @Override
-    @SneakyThrows
+    public void waitForFreeSpace() {
+        semaphore.acquireUninterruptibly();
+        semaphore.release();
+    }
+
+    @Override
     public void waitUntilFinish() {
         log.info("Waiting for processes to finish.");
 
-        while (!threads.isEmpty()) {
-            threads.removeIf(thread -> !thread.isAlive());
-
-            if (!threads.isEmpty()) {
-                threads.getFirst().join();
-            }
-        }
+        semaphore.acquireUninterruptibly(threadLimit);
     }
 
     @Override
@@ -53,11 +46,16 @@ public class FixedSizeProcessStarter implements ProcessStarter {
             final BlockingQueue<Response> queue) {
         log.info("Starting process to crawl domain: {}.", domain);
 
-        threads.add(
-                Thread.ofVirtual()
-                        .name("turbine-crawler-" + domain)
-                        // TODO: I think the response handler should come from outside as well...
-                        .start(new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandler, responseHandler, queue))
-        );
+        semaphore.acquireUninterruptibly();
+
+        Thread.ofVirtual()
+                .name("turbine-crawler-" + domain)
+                // TODO: I think the response handler should come from outside as well...
+                .start(() -> {
+                    new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandler,
+                            responseHandler, queue).run();
+
+                    semaphore.release();
+                });
     }
 }

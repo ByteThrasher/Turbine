@@ -87,13 +87,13 @@ public class Turbine {
                     log.info("Crawl finished! No more locations to process.");
                     break;
                 } else {
-                    if (!processStarter.atProcessLimit()) {
-                        final String domain = locationContainer.allocateDomain();
+                    processStarter.waitForFreeSpace();
 
-                        if (domain != null) {
-                            // TODO: Instead of passing the queue around, there should be an abstraction above it.
-                            processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
-                        }
+                    final String domain = locationContainer.allocateDomain();
+
+                    if (domain != null) {
+                        // TODO: Instead of passing the queue around, there should be an abstraction above it.
+                        processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
                     }
                 }
             }

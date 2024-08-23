@@ -54,6 +54,7 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
         final PoolingHttpClientConnectionManager connectionManager =
                 new PoolingHttpClientConnectionManager(socketFactoryRegistry);
 
+        // TODO: Configure maximum redirect.
         httpClient = HttpClientBuilder.create()
                 // TODO: The connection manager above is created to allow connections to unverified SSL hosts which
                 //  might not be the desired behaviour by every caller. We need to add a flag like
