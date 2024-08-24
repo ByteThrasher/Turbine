@@ -7,8 +7,8 @@ import com.bytethrasher.turbine.location.provider.LocationProvider;
 import com.bytethrasher.turbine.location.provider.domain.DefaultLocationBatch;
 import com.bytethrasher.turbine.process.starter.FixedSizeProcessStarter;
 import com.bytethrasher.turbine.process.starter.ProcessStarter;
-import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandler;
-import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.RequestHandlerFactory;
+import com.bytethrasher.turbine.request.ApacheHttpClientRequestHandlerFactory;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import com.bytethrasher.turbine.response.writer.ResponseWriter;
@@ -41,7 +41,7 @@ public class Turbine {
             .build();
 
     @Builder.Default
-    private final RequestHandler requestHandler = ApacheHttpClientRequestHandler.builder()
+    private final RequestHandlerFactory requestHandlerFactory = ApacheHttpClientRequestHandlerFactory.builder()
             .build();
 
     @Builder.Default
@@ -87,13 +87,14 @@ public class Turbine {
                     log.info("Crawl finished! No more locations to process.");
                     break;
                 } else {
-                    processStarter.waitForFreeSpace();
+                    processStarter.waitUntilAbleToStart();
 
                     final String domain = locationContainer.allocateDomain();
 
                     if (domain != null) {
                         // TODO: Instead of passing the queue around, there should be an abstraction above it.
-                        processStarter.startProcess(domain, locationContainer, requestHandler, responseHandler, queue);
+                        processStarter.startProcess(domain, locationContainer, requestHandlerFactory,
+                                responseHandler, queue);
                     }
                 }
             }

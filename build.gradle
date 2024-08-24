@@ -28,6 +28,9 @@ dependencies {
     // WARC
     implementation group: 'org.netpreserve', name: 'jwarc', version: '0.30.0'
 
+    // System information
+    implementation group: 'com.github.oshi', name: 'oshi-core', version: '6.6.3'
+
     // Test
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.10.3'
     testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.10.3'

@@ -6,11 +6,11 @@ import com.bytethrasher.turbine.request.domain.Header;
 import com.bytethrasher.turbine.request.domain.Response;
 import lombok.Builder;
 import lombok.SneakyThrows;
-import org.apache.hc.client5.http.HttpHostConnectException;
-import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.ClientProtocolException;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.BasicHttpClientConnectionManager;
 import org.apache.hc.client5.http.socket.ConnectionSocketFactory;
 import org.apache.hc.client5.http.socket.PlainConnectionSocketFactory;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
@@ -24,21 +24,18 @@ import org.apache.hc.core5.ssl.TrustStrategy;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
+import java.io.IOException;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 public class ApacheHttpClientRequestHandler implements RequestHandler {
 
-    private static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            + " (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246";
-
-    private final HttpClient httpClient;
+    private final CloseableHttpClient httpClient;
 
     @Builder
     @SneakyThrows
     public ApacheHttpClientRequestHandler(final String userAgent) {
-        final String realUserAgent = userAgent == null ? DEFAULT_USER_AGENT : userAgent;
-
         final TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
         final SSLContext sslContext = SSLContexts.custom()
                 .loadTrustMaterial(null, acceptingTrustStrategy)
@@ -51,8 +48,9 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
                         .register("http", new PlainConnectionSocketFactory())
                         .build();
 
-        final PoolingHttpClientConnectionManager connectionManager =
-                new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+        // We are using a basic connection manager because each domain gets its own RequestHandler.
+        final BasicHttpClientConnectionManager connectionManager =
+                new BasicHttpClientConnectionManager(socketFactoryRegistry);
 
         // TODO: Configure maximum redirect.
         httpClient = HttpClientBuilder.create()
@@ -61,7 +59,7 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
                 //  "thrustAllCertificates" or something similar.
                 //  See: https://www.baeldung.com/httpclient-ssl#ssl_config
                 .setConnectionManager(connectionManager)
-                .setUserAgent(realUserAgent)
+                .setUserAgent(userAgent)
                 .build();
     }
 
@@ -83,15 +81,20 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
                                 response.getEntity().getContentType(), response.getReasonPhrase());
                     }
             );
-        } catch (final SocketTimeoutException | SSLHandshakeException e) {
-            // TODO: retry
+        } catch (final SocketTimeoutException | SSLHandshakeException | ClientProtocolException e) {
+            // TODO: retry or return failed response
             return null;
-        } catch (final NoHttpResponseException | HttpHostConnectException | UnknownHostException e) {
+        } catch (final NoHttpResponseException | SocketException | UnknownHostException e) {
             // The server failed to respond with anything meaningful. Let's return a poison pill so we doesn't process
             // any of the other locations from this domain.
             // TODO: Why null? Other than it's faster to return than throwing an exception. We need to return with a
             //  proper exception though.
             return null;
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        httpClient.close();
     }
 }

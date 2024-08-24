@@ -24,6 +24,7 @@ public class WARCResponseWriter implements ResponseWriter {
     @Builder
     @SneakyThrows
     public WARCResponseWriter() {
+        // TODO: The path should come from a property.
         writer = new WarcWriter(Path.of(System.getProperty("user.dir")).resolve("result.warc"));
     }
 

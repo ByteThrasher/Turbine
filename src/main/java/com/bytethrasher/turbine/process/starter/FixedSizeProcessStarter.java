@@ -2,7 +2,7 @@ package com.bytethrasher.turbine.process.starter;
 
 import com.bytethrasher.turbine.location.container.LocationContainer;
 import com.bytethrasher.turbine.process.CrawlingProcess;
-import com.bytethrasher.turbine.request.RequestHandler;
+import com.bytethrasher.turbine.request.RequestHandlerFactory;
 import com.bytethrasher.turbine.request.domain.Response;
 import com.bytethrasher.turbine.response.ResponseHandler;
 import lombok.Builder;
@@ -28,7 +28,7 @@ public class FixedSizeProcessStarter implements ProcessStarter {
     }
 
     @Override
-    public void waitForFreeSpace() {
+    public void waitUntilAbleToStart() {
         semaphore.acquireUninterruptibly();
         semaphore.release();
     }
@@ -42,7 +42,7 @@ public class FixedSizeProcessStarter implements ProcessStarter {
 
     @Override
     public void startProcess(final String domain, final LocationContainer locationContainer,
-            final RequestHandler requestHandler, final ResponseHandler responseHandler,
+            final RequestHandlerFactory requestHandlerFactory, final ResponseHandler responseHandler,
             final BlockingQueue<Response> queue) {
         log.info("Starting process to crawl domain: {}.", domain);
 
@@ -52,7 +52,7 @@ public class FixedSizeProcessStarter implements ProcessStarter {
                 .name("turbine-crawler-" + domain)
                 // TODO: I think the response handler should come from outside as well...
                 .start(() -> {
-                    new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandler,
+                    new CrawlingProcess(domain, crawlDelay, locationContainer, requestHandlerFactory,
                             responseHandler, queue).run();
 
                     semaphore.release();
