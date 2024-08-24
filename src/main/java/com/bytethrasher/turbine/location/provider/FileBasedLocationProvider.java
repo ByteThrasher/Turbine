@@ -36,14 +36,13 @@ public class FileBasedLocationProvider implements LocationProvider {
             return null;
         }
 
-        final String domain = urlParser.parseDomain(lastLine);
-
         final List<String> locations = new LinkedList<>();
 
+        String domain = urlParser.parseDomain(lastLine);
         String actualDomain = domain;
 
         // The actualDomain can be null if the host can't be parsed from the URL aka location.
-        while (actualDomain == null || actualDomain.equals(domain)) {
+        while (domain == null || actualDomain == null || actualDomain.equals(domain)) {
             // We don't want to handle locations without a host.
             if (actualDomain != null) {
                 locations.add(lastLine);
@@ -60,6 +59,11 @@ public class FileBasedLocationProvider implements LocationProvider {
             }
 
             actualDomain = urlParser.parseDomain(lastLine);
+
+            // This fixes a bug that only happens when the first line's url has no valid domain.
+            if (domain == null && actualDomain != null) {
+                domain = actualDomain;
+            }
         }
 
         return new DefaultLocationBatch(domain, locations);
