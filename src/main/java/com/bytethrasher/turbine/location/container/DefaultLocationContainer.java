@@ -116,8 +116,7 @@ public class DefaultLocationContainer implements LocationContainer {
     public void dropDomain(final String domain) {
         log.debug("Dropping domain: {}.", domain);
 
-        locations.entrySet()
-                .removeIf(entry -> entry.getKey().equals(domain));
+        locations.remove(domain);
     }
 
     @Override

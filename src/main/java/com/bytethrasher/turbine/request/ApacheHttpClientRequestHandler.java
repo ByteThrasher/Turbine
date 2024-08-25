@@ -45,7 +45,7 @@ public class ApacheHttpClientRequestHandler implements RequestHandler {
         final Registry<ConnectionSocketFactory> socketFactoryRegistry =
                 RegistryBuilder.<ConnectionSocketFactory>create()
                         .register("https", sslsf)
-                        .register("http", new PlainConnectionSocketFactory())
+                        .register("http", PlainConnectionSocketFactory.getSocketFactory())
                         .build();
 
         // We are using a basic connection manager because each domain gets its own RequestHandler.
